@@ -29,6 +29,8 @@ def load_run(path):
                 ts = p.time.timestamp()
                 if prev is not None:
                     dt = ts - prev.time.timestamp()
+                    if dt == 0:
+                        continue #duplicate timestamp:skip the point
                     if dt <= 0 or dt > MAX_GAP:
                         if len(times) >= 2:
                             pieces.append((np.array(times) - times[0], np.array(dist)))
@@ -52,6 +54,10 @@ def load_run(path):
 def best_effort(times, dist, target):
     """Fastest time (s) to cover `target` metres anywhere in the run."""
     if dist[-1] < target:
+        # GPS often measures a race slightly short. If the run is within 2%
+        # of the target, scale its time up to the full distance.
+        if dist[-1] >= target * 0.98:
+            return times[-1] * target / dist[-1]
         return None
     best = np.inf
     j = 0
