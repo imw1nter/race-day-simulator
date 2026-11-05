@@ -221,3 +221,5 @@ __marimo__/
 
 # Personal training runs (contain GPS location)
 sample_data/runs/
+# macOS system files
+.DS_Store
