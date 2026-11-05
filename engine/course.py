@@ -47,9 +47,12 @@ def smooth(values, window=5):
     return np.convolve(padded, kernel, mode="valid")[: len(values)]
 
 
-def build_course(path, step=100.0, window=5):
+def build_course(path, step=100.0, window=5, official_distance=None):
     """Load a GPX file and turn it into evenly spaced, smoothed segments."""
     raw_dist, raw_elev = load_points(path)
+    if official_distance:
+        raw_dist = raw_dist * official_distance / raw_dist[-1]
+        
 
     # Equal steps from 0 to the end of the course
     grid = np.arange(0, raw_dist[-1], step)
