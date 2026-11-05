@@ -1,3 +1,4 @@
+import warnings
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
@@ -24,14 +25,16 @@ def read_fit(path):
     indoor/treadmill runs as well as outdoor runs.
     """
     samples = []
-    with fitdecode.FitReader(path) as fit:
-        for frame in fit:
-            if frame.frame_type != fitdecode.FIT_FRAME_DATA or frame.name != "record":
-                continue
-            if frame.has_field("timestamp") and frame.has_field("distance"):
-                t, d = frame.get_value("timestamp"), frame.get_value("distance")
-                if t is not None and d is not None:
-                    samples.append((t.timestamp(), float(d)))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        with fitdecode.FitReader(path) as fit:
+         for frame in fit:
+                if frame.frame_type != fitdecode.FIT_FRAME_DATA or frame.name != "record":
+                    continue
+                if frame.has_field("timestamp") and frame.has_field("distance"):
+                    t, d = frame.get_value("timestamp"), frame.get_value("distance")
+                    if t is not None and d is not None:
+                        samples.append((t.timestamp(), float(d)))
     return samples
 
 
