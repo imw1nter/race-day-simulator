@@ -1,8 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Race Day Simulator</title></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Race Day Simulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
 <body>
-  <h1>Race Day Simulator</h1>
-  <p>Frontend coming soon. Try the API at <a href="/docs">/docs</a>.</p>
+  <header>
+    <h1>Race Day Simulator</h1>
+    <p>Simulate your marathon before you run it: course, fitness, weather, and pacing.</p>
+  </header>
+
+  <main>
+    <form id="sim-form" class="card">
+      <h2>1. Course</h2>
+      <label>Built-in course
+        <select id="course_id"></select>
+      </label>
+      <label>Or upload your own course (GPX)
+        <input type="file" id="course_file" accept=".gpx">
+      </label>
+      <label>Official distance of your uploaded course in km (optional)
+        <input type="number" id="course_distance_km" step="0.001" min="1">
+      </label>
+
+      <h2>2. Fitness</h2>
+      <label>Training runs (GPX, FIT, or TCX, several allowed)
+        <input type="file" id="runs" multiple accept=".gpx,.fit,.tcx">
+      </label>
+      <label>Or enter your current fitness for this distance (h:mm:ss)
+        <input type="text" id="fitness_time" placeholder="3:55:00">
+      </label>
+
+      <h2>3. Race day</h2>
+      <div class="row">
+        <label>Goal time
+          <input type="text" id="goal_time" value="4:00:00">
+        </label>
+        <label>Temperature (°C)
+          <input type="number" id="temp_c" value="12" step="0.5">
+        </label>
+        <label>Dew point (°C)
+          <input type="number" id="dew_c" value="5" step="0.5">
+        </label>
+        <label>Simulations
+          <input type="number" id="simulations" value="2000" min="100" max="10000" step="100">
+        </label>
+      </div>
+
+      <button type="submit" id="submit">Simulate race</button>
+      <p id="status" role="status"></p>
+    </form>
+
+    <section id="results" hidden>
+      <div class="stats">
+        <div class="card stat">
+          <span class="label" id="p-goal-label">Chance of goal</span>
+          <span class="value" id="p-goal"></span>
+        </div>
+        <div class="card stat">
+          <span class="label">Median finish</span>
+          <span class="value" id="median"></span>
+        </div>
+        <div class="card stat">
+          <span class="label">80% of races</span>
+          <span class="value small" id="range"></span>
+        </div>
+        <div class="card stat">
+          <span class="label">Predicted fitness</span>
+          <span class="value" id="predicted"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Pacing strategies</h2>
+        <table id="strategies"></table>
+        <p id="optimized-note" class="note"></p>
+      </div>
+
+      <div class="card">
+        <h2>Fitness</h2>
+        <p id="fitness-source" class="note"></p>
+        <ul id="efforts"></ul>
+        <ul id="skipped" class="warning"></ul>
+      </div>
+
+      <div class="card">
+        <h2>Kilometre splits (optimized plan)</h2>
+        <div class="table-scroll">
+          <table id="splits"></table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
 </body>
 </html>
