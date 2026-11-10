@@ -288,6 +288,7 @@ function minutesText(seconds) {
   return `about ${m} minute${m === 1 ? "" : "s"}`;
 }
 
+let lastTakeaways = [];
 function renderTakeaways(data) {
   const { optimized: opt, insights, monte_carlo: mc } = data;
   const goalText = fmtTime(mc.goal_s);
@@ -331,6 +332,7 @@ function renderTakeaways(data) {
     }
   }
 
+  lastTakeaways = items;
   $("takeaways").replaceChildren(...items.map(([icon, t, body]) => {
     const li = el("li");
     li.innerHTML = iconSvg(icon);
@@ -620,9 +622,12 @@ function renderSplits() {
     ["Km", "Split", "Avg pace", "Elapsed"],
     rows.map((r) => [kmLabel(r.endKm), fmtDuration(r.time), fmtPace(r.pace), fmtTime(r.elapsed)]),
   );
-  $("band-hint").textContent = splitSize === 1
-    ? "Pace band: a detailed wrist strip with every kilometer. Print at 100% scale, cut along the dashed line, and tape around your wrist."
-    : "Pace band: a wrist strip with big, easy-to-read checkpoints. Print at 100% scale, cut along the dashed line, and tape around your wrist.";
+    $("band-hint").textContent =
+    (splitSize === 1
+      ? "Pace band: a detailed wrist strip with every kilometer. "
+      : "Pace band: a wrist strip with big, easy-to-read checkpoints. ") +
+    "Pace card: a pocket card with terrain notes and your key race tips. " +
+    "Print both at 100% scale and cut along the dashed line.";
 }
 
 document.querySelectorAll("[data-interval]").forEach((b) => {
@@ -931,11 +936,15 @@ async function downloadPaceBand() {
     }
   }
 
+  saveCanvas(canvas, `pace-band-${splitSize}km.png`);
+}
+
+function saveCanvas(canvas, filename) {
   canvas.toBlob((blob) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `pace-band-${splitSize}km.png`;
+    link.download = filename;
     document.body.appendChild(link); // Safari is more reliable when the link is on the page
     link.click();
     link.remove();
@@ -943,7 +952,205 @@ async function downloadPaceBand() {
   });
 }
 
+function wrapLines(ctx, text, maxWidth) {
+  const lines = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function sectionGain(course, startKm, endKm) {
+  // Total uphill (m) between two distances
+  let gain = 0;
+  for (let i = 0; i < course.distance.length - 1; i++) {
+    const d = course.distance[i] / 1000;
+    if (d >= startKm && d < endKm) gain += Math.max(0, course.elevation[i + 1] - course.elevation[i]);
+  }
+  return gain;
+}
+
+function sectionTerrain(course, g, climb, isLast) {
+  if (isLast) return "Finish";
+  if (climb && g.endKm > climb.start_km && g.startKm < climb.end_km) return "Biggest climb";
+  if (sectionGain(course, g.startKm, g.endKm) >= 8) return "Hilly";
+  if (g.startKm >= 30) return "Stay strong";
+  return "Steady";
+}
+
+async function downloadPaceCard() {
+  if (!lastResult) return;
+  try {
+    await document.fonts.load('500 44px "Oxanium"'); // canvas text needs the font loaded first
+  } catch {
+    // fall back to system fonts
+  }
+
+  const { course, optimized, strategies, monte_carlo: mc, insights } = lastResult;
+  const totalKm = course.distance_m / 1000;
+  const groups = groupSplits(optimized.km_splits, totalKm, splitSize);
+  const finish = strategies.find((s) => s.name === "Optimized").finish_s;
+  const climb = insights && insights.climb.gain_m >= 3 ? insights.climb : null;
+  const DISPLAY = '"Oxanium", "Arial Narrow", sans-serif';
+  const BODY = '"Work Sans", system-ui, sans-serif';
+
+  // Layout (CSS pixels; drawn at 3x for a sharp print)
+  const W = 360;
+  const pad = 16;
+  const cardW = W - pad * 2;
+  const headerH = 132;
+  const colH = 28;
+  const rowH = 26;
+
+  // Measure the tips first so the card is exactly as tall as it needs to be
+  const measure = document.createElement("canvas").getContext("2d");
+  measure.font = `13px ${BODY}`;
+  const tips = lastTakeaways.slice(0, 2).map(([, title]) => wrapLines(measure, title, cardW - 18));
+  const tipsH = tips.reduce((h, lines) => h + lines.length * 18 + 6, 0);
+  const H = pad + headerH + colH + groups.length * rowH + 16 + tipsH + 34;
+  const scale = 3;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * scale;
+  canvas.height = H * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+
+  // Dashed cutting guide
+  ctx.setLineDash([6, 5]);
+  ctx.strokeStyle = "#9AA7BF";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(4, 4, W - 8, H - 8, 14);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Navy gantry header
+  ctx.fillStyle = "#13203A";
+  ctx.beginPath();
+  ctx.roundRect(pad, pad, cardW, headerH, [12, 12, 0, 0]);
+  ctx.fill();
+
+  ctx.font = `11px ${BODY}`;
+  ctx.fillStyle = "#AEB9CC";
+  ctx.textAlign = "left";
+  ctx.fillText(fitText(ctx, course.name, cardW - 130), pad + 12, pad + 20);
+  ctx.textAlign = "right";
+  ctx.fillText("Optimized plan", pad + cardW - 12, pad + 20);
+
+  // Clock screen with unlit segments behind the digits
+  const screenY = pad + 30;
+  ctx.fillStyle = "#0A1222";
+  ctx.beginPath();
+  ctx.roundRect(pad + 12, screenY, cardW - 24, 64, 8);
+  ctx.fill();
+  const timeText = fmtTime(finish);
+  ctx.textAlign = "center";
+  ctx.font = `500 44px ${DISPLAY}`;
+  ctx.fillStyle = "#1A2338";
+  ctx.fillText(timeText.replace(/\d/g, "8"), W / 2, screenY + 48);
+  ctx.fillStyle = "#FFB000";
+  ctx.fillText(timeText, W / 2, screenY + 48);
+
+  ctx.font = `11px ${BODY}`;
+  ctx.fillStyle = "#AEB9CC";
+  ctx.textAlign = "left";
+  ctx.fillText(`Goal ${fmtTime(mc.goal_s)}`, pad + 12, pad + headerH - 14);
+  ctx.textAlign = "right";
+  ctx.fillText(`${Math.round(mc.p_goal * 100)}% chance`, pad + cardW - 12, pad + headerH - 14);
+
+  // Column headers
+  let y = pad + headerH;
+  const colKm = pad + 12;
+  const colSplit = pad + 72;
+  const colElapsed = pad + 142;
+  const colTerrain = pad + cardW - 12;
+  ctx.fillStyle = "#F1F4F9";
+  ctx.fillRect(pad, y, cardW, colH);
+  ctx.font = `11px ${BODY}`;
+  ctx.fillStyle = "#5A6782";
+  ctx.textAlign = "left";
+  ctx.fillText("Km", colKm, y + 18);
+  ctx.fillText("Split", colSplit, y + 18);
+  ctx.fillText("Elapsed", colElapsed, y + 18);
+  ctx.textAlign = "right";
+  ctx.fillText("Terrain", colTerrain, y + 18);
+  y += colH;
+
+  // Checkpoint rows
+  groups.forEach((g, i) => {
+    const isLast = i === groups.length - 1;
+    const terrain = sectionTerrain(course, g, climb, isLast);
+
+    if (isLast) {
+      ctx.fillStyle = "#13203A";
+      ctx.fillRect(pad, y, cardW, rowH);
+    } else if (terrain === "Biggest climb") {
+      ctx.fillStyle = "#FFF1CC";
+      ctx.fillRect(pad, y, cardW, rowH);
+    }
+    ctx.strokeStyle = "#E1E5EC";
+    ctx.beginPath();
+    ctx.moveTo(pad, y + rowH);
+    ctx.lineTo(pad + cardW, y + rowH);
+    ctx.stroke();
+
+    const base = y + 17;
+    ctx.textAlign = "left";
+    ctx.fillStyle = isLast ? "#E8EDF5" : "#13203A";
+    ctx.font = `500 13px ${DISPLAY}`;
+    ctx.fillText(kmLabel(g.endKm), colKm, base);
+    ctx.font = `13px ${BODY}`;
+    ctx.fillStyle = isLast ? "#AEB9CC" : "#13203A";
+    ctx.fillText(fmtDuration(g.time), colSplit, base);
+    ctx.font = `500 14px ${DISPLAY}`;
+    ctx.fillStyle = isLast ? "#FFB000" : "#13203A";
+    ctx.fillText(fmtTime(g.elapsed), colElapsed, base);
+    ctx.textAlign = "right";
+    ctx.font = `11px ${BODY}`;
+    ctx.fillStyle = isLast ? "#AEB9CC" : "#5A6782";
+    ctx.fillText(terrain, colTerrain, base);
+    y += rowH;
+  });
+
+  // Table outline
+  ctx.strokeStyle = "#D3D9E4";
+  ctx.strokeRect(pad + 0.5, pad + headerH, cardW - 1, y - (pad + headerH));
+
+  // Race tips (the first two takeaways)
+  y += 16;
+  ctx.textAlign = "left";
+  ctx.font = `13px ${BODY}`;
+  tips.forEach((lines) => {
+    ctx.fillStyle = "#FFB000";
+    ctx.beginPath();
+    ctx.arc(pad + 6, y + 8, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#13203A";
+    lines.forEach((line, k) => ctx.fillText(line, pad + 18, y + 13 + k * 18));
+    y += lines.length * 18 + 6;
+  });
+
+  ctx.textAlign = "center";
+  ctx.font = `10px ${BODY}`;
+  ctx.fillStyle = "#9AA7BF";
+  ctx.fillText("Race Day Simulator", W / 2, H - 16);
+
+  saveCanvas(canvas, `pace-card-${splitSize}km.png`);
+}
 $("download-band").addEventListener("click", downloadPaceBand);
+$("download-card").addEventListener("click", downloadPaceCard);
 
 // --- Start ---------------------------------------------------------------------------------------
 
