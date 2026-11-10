@@ -69,6 +69,7 @@ function drawProfile(course, paces) {
   const km = course.distance.map((d) => d / 1000);
   makeChart("profile-chart", {
     type: "line",
+    plugins: [replayCursor],
     data: {
       datasets: [
         {
@@ -153,6 +154,205 @@ function drawHistogram(mc) {
     },
   });
 }
+
+// --- Ghost-runner replay -----------------------------------------------------
+
+function fmtDuration(seconds) {
+  const s = Math.round(seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+let lastResult = null;
+const replay = {
+  course: null, paces: null, cum: null, step: 100, finish: 0, goal: 0,
+  t: 0, distance: 0, playing: false, last: null, runner: null, ghost: null,
+};
+
+// Draws a dashed line on the elevation chart at the runner's current distance
+const replayCursor = {
+  id: "replayCursor",
+  afterDatasetsDraw(chart) {
+    if (!replay.course) return;
+    const x = chart.scales.x.getPixelForValue(replay.distance / 1000);
+    const { top, bottom } = chart.chartArea;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.strokeStyle = cssVar("--accent");
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
+function latLngAt(d) {
+  // Position on the map at distance d (m), interpolated between segment points
+  const { course, step } = replay;
+  const last = course.lat.length - 1;
+  const x = Math.min(d / step, last);
+  const i = Math.floor(x);
+  const j = Math.min(i + 1, last);
+  const f = x - i;
+  return [
+    course.lat[i] + f * (course.lat[j] - course.lat[i]),
+    course.lon[i] + f * (course.lon[j] - course.lon[i]),
+  ];
+}
+
+function distanceAt(t) {
+  // Distance (m) reached at race time t (s), using binary search on the time table
+  const { cum, step, course } = replay;
+  if (t >= replay.finish) return course.distance_m;
+  let lo = 0;
+  let hi = cum.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (cum[mid] <= t) lo = mid;
+    else hi = mid;
+  }
+  return course.distance[lo] + ((t - cum[lo]) / (cum[lo + 1] - cum[lo])) * step;
+}
+
+function setupReplay(course, paces, goalSeconds) {
+  const step = course.distance[1] - course.distance[0];
+  const cum = [0];
+  for (const p of paces) cum.push(cum.at(-1) + (p * step) / 1000);
+
+  Object.assign(replay, {
+    course, paces, cum, step, finish: cum.at(-1), goal: goalSeconds,
+    t: 0, playing: false, last: null,
+  });
+  $("scrub").max = Math.round(replay.finish);
+  $("play").textContent = "▶ Play";
+
+  if (replay.runner) replay.runner.remove();
+  if (replay.ghost) replay.ghost.remove();
+  replay.ghost = L.circleMarker(latLngAt(0), { radius: 7, color: cssVar("--muted"), fillOpacity: 0.6 })
+    .bindTooltip(`Goal pace (${fmtTime(goalSeconds)})`).addTo(map);
+  replay.runner = L.circleMarker(latLngAt(0), { radius: 8, color: cssVar("--accent"), fillOpacity: 1 })
+    .bindTooltip("You (optimized plan)").addTo(map);
+  updateReplay();
+}
+
+function updateReplay() {
+  const { t, course, goal, step } = replay;
+  const total = course.distance_m;
+  const d = distanceAt(t);
+  replay.distance = d;
+
+  replay.runner.setLatLng(latLngAt(d));
+  replay.ghost.setLatLng(latLngAt(Math.min(total, (t / goal) * total)));
+  $("scrub").value = Math.round(t);
+
+  const seg = Math.min(Math.floor(d / step), replay.paces.length - 1);
+  const gap = (d / total) * goal - t; // positive = ahead of goal pace
+  const gapText = Math.abs(gap) < 1
+    ? "on goal pace"
+    : `${fmtDuration(Math.abs(gap))} ${gap > 0 ? "ahead of" : "behind"} goal pace`;
+  $("replay-info").textContent =
+    `${fmtTime(t)} · ${(d / 1000).toFixed(2)} km · ${fmtPace(replay.paces[seg])} · ${gapText}`;
+
+  if (charts["profile-chart"]) charts["profile-chart"].draw();
+}
+
+function tick(now) {
+  if (!replay.playing) return;
+  if (replay.last !== null) {
+    const speed = Number($("speed").value);
+    replay.t = Math.min(replay.finish, replay.t + ((now - replay.last) / 1000) * speed);
+  }
+  replay.last = now;
+  updateReplay();
+  if (replay.t >= replay.finish) {
+    replay.playing = false;
+    $("play").textContent = "↺ Replay";
+    return;
+  }
+  requestAnimationFrame(tick);
+}
+
+$("play").addEventListener("click", () => {
+  if (!replay.course) return;
+  if (replay.t >= replay.finish) replay.t = 0;
+  replay.playing = !replay.playing;
+  replay.last = null;
+  $("play").textContent = replay.playing ? "❚❚ Pause" : "▶ Play";
+  if (replay.playing) requestAnimationFrame(tick);
+});
+
+$("scrub").addEventListener("input", (event) => {
+  if (!replay.course) return;
+  replay.t = Number(event.target.value);
+  updateReplay();
+});
+
+// --- Pace band download --------------------------------------------------------
+
+function downloadPaceBand() {
+  if (!lastResult) return;
+  const { course, optimized, strategies } = lastResult;
+  const splits = optimized.km_splits;
+  const totalKm = course.distance_m / 1000;
+  const finish = strategies.find((s) => s.name === "Optimized").finish_text;
+
+  const width = 320;
+  const rowH = 26;
+  const top = 104;
+  const height = top + splits.length * rowH + 16;
+  const scale = 2; // draw at double resolution for a sharp print
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#e4572e";
+  ctx.font = "bold 18px system-ui, sans-serif";
+  ctx.fillText("Race Day Simulator", 16, 28);
+  ctx.fillStyle = "#1c2430";
+  ctx.font = "13px system-ui, sans-serif";
+  ctx.fillText(course.name, 16, 48);
+  ctx.fillText(`Optimized plan · finish ${finish}`, 16, 66);
+
+  ctx.font = "bold 12px system-ui, sans-serif";
+  ctx.fillStyle = "#5d6878";
+  ctx.fillText("KM", 16, 94);
+  ctx.fillText("SPLIT", 110, 94);
+  ctx.fillText("ELAPSED", 210, 94);
+
+  ctx.font = "15px ui-monospace, Menlo, monospace";
+  let elapsed = 0;
+  splits.forEach((t, i) => {
+    elapsed += t;
+    const y = top + i * rowH;
+    const isLast = i === splits.length - 1;
+    const km = isLast ? totalKm.toFixed(1) : String(i + 1);
+    if ((i + 1) % 5 === 0 || isLast) {
+      ctx.fillStyle = "#fde7df"; // highlight every 5 km and the finish
+      ctx.fillRect(8, y, width - 16, rowH);
+    }
+    ctx.fillStyle = "#1c2430";
+    ctx.fillText(km, 16, y + 18);
+    ctx.fillText(fmtDuration(t), 110, y + 18);
+    ctx.fillText(fmtTime(elapsed), 210, y + 18);
+  });
+
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "pace-band.png";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+}
+
+$("download-band").addEventListener("click", downloadPaceBand);
 
 // --- Safe DOM helpers (textContent only, never innerHTML, to prevent XSS) ----
 
@@ -294,6 +494,8 @@ function showResults(data) {
   drawMap(data.course);
   drawProfile(data.course, opt.segment_paces);
   drawHistogram(mc);
+  lastResult = data;
+  setupReplay(data.course, opt.segment_paces, mc.goal_s);
   $("results").scrollIntoView({ behavior: "smooth" });
 }
 

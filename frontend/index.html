@@ -74,11 +74,22 @@
           <span class="value" id="predicted"></span>
         </div>
       </div>
-      
+
         <div class="card">
          <h2>Course</h2>
           <p id="course-info" class="note"></p>
         <div id="map"></div>
+        <div class="replay">
+          <button type="button" id="play">▶ Play</button>
+          <input type="range" id="scrub" min="0" max="1" value="0" aria-label="Race time">
+          <select id="speed" aria-label="Replay speed">
+            <option value="60">60×</option>
+            <option value="300" selected>300×</option>
+            <option value="900">900×</option>
+          </select>
+        </div>
+        <p id="replay-info" class="note"></p>
+        <p class="note">Orange dot: you, following the optimized plan. Gray dot: even pace at your goal time.</p>
       </div>
 
         <div class="card">
@@ -109,6 +120,7 @@
 
       <div class="card">
         <h2>Kilometre splits (optimized plan)</h2>
+        <button type="button" id="download-band" class="secondary">Download pace band (PNG)</button>
         <div class="table-scroll">
           <table id="splits"></table>
         </div>
