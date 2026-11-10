@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Race Day Simulator</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -72,6 +74,25 @@
           <span class="value" id="predicted"></span>
         </div>
       </div>
+      
+        <div class="card">
+         <h2>Course</h2>
+          <p id="course-info" class="note"></p>
+        <div id="map"></div>
+      </div>
+
+        <div class="card">
+          <h2>Elevation and planned pace</h2>
+          <p class="note">The orange line is your optimized pace (higher = faster). Watch it dip on climbs and rise on descents.</p>
+        <div class="chart-box"><canvas id="profile-chart"></canvas></div>
+      </div>
+
+        <div class="card">
+          <h2>Finish-time distribution</h2>
+          <p id="histogram-note" class="note"></p>
+        <div class="chart-box"><canvas id="histogram-chart"></canvas></div>
+       </div>
+      </div>
 
       <div class="card">
         <h2>Pacing strategies</h2>
@@ -95,6 +116,8 @@
     </section>
   </main>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

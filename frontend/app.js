@@ -14,6 +14,146 @@ function fmtPace(secondsPerKm) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}/km`;
 }
 
+function fmtClock(seconds) {
+  const m = Math.floor(seconds / 60);
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+}
+
+// Read a color from the CSS variables, so charts match light and dark mode
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// --- Map -----------------------------------------------------------------------
+
+let map = null;
+let routeLayer = null;
+
+function drawMap(course) {
+  if (!map) {
+    map = L.map("map", { scrollWheelZoom: false });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+  }
+  map.invalidateSize(); // the map was hidden until now, so let Leaflet re-measure it
+  if (routeLayer) routeLayer.remove();
+
+  const points = course.lat.map((lat, i) => [lat, course.lon[i]]);
+  const route = L.polyline(points, { color: cssVar("--accent"), weight: 4 });
+  const layers = [
+    route,
+    L.circleMarker(points[0], { radius: 7, color: "#16a34a", fillOpacity: 1 }).bindTooltip("Start"),
+    L.circleMarker(points.at(-1), { radius: 7, color: "#dc2626", fillOpacity: 1 }).bindTooltip("Finish"),
+  ];
+  for (let km = 5; km * 1000 < course.distance_m; km += 5) {
+    const i = course.distance.findIndex((d) => d >= km * 1000);
+    if (i >= 0) {
+      layers.push(L.circleMarker(points[i], { radius: 4, color: cssVar("--text"), fillOpacity: 1 })
+        .bindTooltip(`${km} km`));
+    }
+  }
+  routeLayer = L.layerGroup(layers).addTo(map);
+  map.fitBounds(route.getBounds(), { padding: [20, 20] });
+}
+
+// --- Charts --------------------------------------------------------------------
+
+const charts = {};
+
+function makeChart(id, config) {
+  if (charts[id]) charts[id].destroy(); // replace the old chart on a new simulation
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+function drawProfile(course, paces) {
+  const km = course.distance.map((d) => d / 1000);
+  makeChart("profile-chart", {
+    type: "line",
+    data: {
+      datasets: [
+        {
+          label: "Elevation (m)",
+          data: km.map((x, i) => ({ x, y: course.elevation[i] })),
+          yAxisID: "elev",
+          borderColor: cssVar("--muted"),
+          backgroundColor: "rgba(127, 127, 127, 0.2)",
+          fill: true,
+          pointRadius: 0,
+          borderWidth: 1,
+        },
+        {
+          label: "Planned pace",
+          data: km.map((x, i) => ({ x, y: paces[i] })),
+          yAxisID: "pace",
+          borderColor: cssVar("--accent"),
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { type: "linear", max: course.distance_m / 1000, ticks: { stepSize: 5}, title: { display: true, text: "Distance (km)" } },
+        elev: { position: "left", title: { display: true, text: "Elevation (m)" } },
+        pace: {
+          position: "right",
+          reverse: true, // faster pace plotted higher
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: "Pace (min/km)" },
+          ticks: { callback: (v) => fmtPace(v).replace("/km", "") },
+        },
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            title: (items) => `${items[0].parsed.x.toFixed(1)} km`,
+            label: (ctx) => ctx.dataset.yAxisID === "pace"
+              ? `Pace: ${fmtPace(ctx.parsed.y)}`
+              : `Elevation: ${ctx.parsed.y.toFixed(1)} m`,
+          },
+        },
+      },
+    },
+  });
+}
+
+function drawHistogram(mc) {
+  const { edges, counts } = mc.histogram;
+  const total = counts.reduce((a, b) => a + b, 0);
+  makeChart("histogram-chart", {
+    type: "bar",
+    data: {
+      labels: counts.map((_, i) => fmtClock(edges[i])),
+      datasets: [{
+        data: counts.map((c) => (c / total) * 100),
+        backgroundColor: counts.map((_, i) => (edges[i + 1] <= mc.goal_s ? cssVar("--accent") : cssVar("--muted"))),
+        barPercentage: 1,
+        categoryPercentage: 1,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      animation: false,
+      scales: {
+        x: { title: { display: true, text: "Finish time" } },
+        y: { title: { display: true, text: "% of simulated races" } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => `${fmtTime(edges[items[0].dataIndex])} – ${fmtTime(edges[items[0].dataIndex + 1])}`,
+            label: (ctx) => `${ctx.parsed.y.toFixed(1)}% of races`,
+          },
+        },
+      },
+    },
+  });
+}
+
 // --- Safe DOM helpers (textContent only, never innerHTML, to prevent XSS) ----
 
 function fillTable(table, headers, rows) {
@@ -140,7 +280,20 @@ function showResults(data) {
   });
   fillTable($("splits"), ["Km", "Pace", "Elapsed"], rows);
 
+    // Text for the new cards
+  $("course-info").textContent =
+    `${data.course.name}: ${(data.course.distance_m / 1000).toFixed(1)} km, ` +
+    `${data.course.total_climb_m} m total climb.`;
+  $("histogram-note").textContent =
+    `${mc.simulations} simulated races. Orange bars finish under your goal of ${fmtTime(mc.goal_s)}.`;
+
+  // Show the section first: the map and charts need to be visible to measure their size
   $("results").hidden = false;
+  Chart.defaults.color = cssVar("--muted");
+  Chart.defaults.borderColor = cssVar("--border");
+  drawMap(data.course);
+  drawProfile(data.course, opt.segment_paces);
+  drawHistogram(mc);
   $("results").scrollIntoView({ behavior: "smooth" });
 }
 

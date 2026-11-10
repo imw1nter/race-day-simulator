@@ -116,3 +116,14 @@ th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
   top: 0;
   background: var(--card);
 }
+
+#map {
+  height: 380px;
+  border-radius: 8px;
+  z-index: 0;
+}
+
+.chart-box {
+  position: relative;
+  height: 300px;
+}
