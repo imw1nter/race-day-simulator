@@ -155,6 +155,38 @@ function drawHistogram(mc) {
   });
 }
 
+// --- Splits ----------------------------------------------------------------------
+
+function groupSplits(kmSplits, totalKm, size) {
+  // Combine 1 km splits into blocks of `size` km. The last block may be shorter.
+  const rows = [];
+  let elapsed = 0;
+  for (let start = 0; start < kmSplits.length; start += size) {
+    const time = kmSplits.slice(start, start + size).reduce((a, b) => a + b, 0);
+    const endKm = Math.min(start + size, totalKm);
+    elapsed += time;
+    rows.push({ endKm, time, pace: time / (endKm - start), elapsed });
+  }
+  return rows;
+}
+
+function kmLabel(km) {
+  return Number.isInteger(km) ? String(km) : km.toFixed(1);
+}
+
+function renderSplits() {
+  if (!lastResult) return;
+  const size = Number($("split-interval").value);
+  const rows = groupSplits(lastResult.optimized.km_splits, lastResult.course.distance_m / 1000, size);
+  fillTable(
+    $("splits"),
+    ["Km", "Split", "Avg pace", "Elapsed"],
+    rows.map((r) => [kmLabel(r.endKm), fmtDuration(r.time), fmtPace(r.pace), fmtTime(r.elapsed)]),
+  );
+}
+
+$("split-interval").addEventListener("change", renderSplits);
+
 // --- Ghost-runner replay -----------------------------------------------------
 
 function fmtDuration(seconds) {
@@ -293,14 +325,15 @@ $("scrub").addEventListener("input", (event) => {
 function downloadPaceBand() {
   if (!lastResult) return;
   const { course, optimized, strategies } = lastResult;
-  const splits = optimized.km_splits;
   const totalKm = course.distance_m / 1000;
+  const size = Number($("split-interval").value);
+  const rows = groupSplits(optimized.km_splits, totalKm, size);
   const finish = strategies.find((s) => s.name === "Optimized").finish_text;
 
   const width = 320;
   const rowH = 26;
   const top = 104;
-  const height = top + splits.length * rowH + 16;
+  const height = top + rows.length * rowH + 16;
   const scale = 2; // draw at double resolution for a sharp print
 
   const canvas = document.createElement("canvas");
@@ -326,20 +359,17 @@ function downloadPaceBand() {
   ctx.fillText("ELAPSED", 210, 94);
 
   ctx.font = "15px ui-monospace, Menlo, monospace";
-  let elapsed = 0;
-  splits.forEach((t, i) => {
-    elapsed += t;
+  rows.forEach((r, i) => {
     const y = top + i * rowH;
-    const isLast = i === splits.length - 1;
-    const km = isLast ? totalKm.toFixed(1) : String(i + 1);
-    if ((i + 1) % 5 === 0 || isLast) {
+    const isLast = i === rows.length - 1;
+    if (isLast || (size === 1 && r.endKm % 5 === 0)) {
       ctx.fillStyle = "#fde7df"; // highlight every 5 km and the finish
       ctx.fillRect(8, y, width - 16, rowH);
     }
     ctx.fillStyle = "#1c2430";
-    ctx.fillText(km, 16, y + 18);
-    ctx.fillText(fmtDuration(t), 110, y + 18);
-    ctx.fillText(fmtTime(elapsed), 210, y + 18);
+    ctx.fillText(kmLabel(r.endKm), 16, y + 18);
+    ctx.fillText(fmtDuration(r.time), 110, y + 18);
+    ctx.fillText(fmtTime(r.elapsed), 210, y + 18);
   });
 
   canvas.toBlob((blob) => {
@@ -347,7 +377,9 @@ function downloadPaceBand() {
     const link = document.createElement("a");
     link.href = url;
     link.download = "pace-band.png";
+    document.body.appendChild(link);
     link.click();
+    link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 }
@@ -529,18 +561,10 @@ function showResults(data) {
   fillList($("efforts"), data.fitness.best_efforts.map(
     (e) => `${distanceLabel(e.distance_m)}: ${e.time_text} (${e.source === "record" ? "personal record" : "from runs"})`,
   ));
-  
-  // Kilometre splits (the last one is usually a partial kilometre)
-  const totalKm = data.course.distance_m / 1000;
-  const splits = opt.km_splits;
-  let elapsed = 0;
-  const rows = splits.map((t, i) => {
-    const length = i < splits.length - 1 ? 1 : totalKm - (splits.length - 1);
-    elapsed += t;
-    const label = i < splits.length - 1 ? `${i + 1}` : totalKm.toFixed(1);
-    return [label, fmtPace(t / length), fmtTime(elapsed)];
-  });
-  fillTable($("splits"), ["Km", "Pace", "Elapsed"], rows);
+
+  // Splits (grouped by the interval chosen in the dropdown)
+  lastResult = data;
+  renderSplits();
 
     // Text for the new cards
   $("course-info").textContent =

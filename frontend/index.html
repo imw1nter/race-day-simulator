@@ -124,7 +124,15 @@
       </div>
 
       <div class="card">
-        <h2>Kilometre splits (optimized plan)</h2>
+        <h2>Splits (optimized plan)</h2>
+        <label class="incline">Every
+          <select id="split-interval">
+            <option value="1">1 km</option>
+            <option value="5">5 km</option>
+            <optiion value="10">10 km</option>
+            </select>
+        </label>
+      </div>
         <button type="button" id="download-band" class="secondary">Download pace band (PNG)</button>
         <div class="table-scroll">
           <table id="splits"></table>
