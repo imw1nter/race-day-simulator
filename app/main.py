@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from engine.course import build_course
 from engine.fitness import collect_best_efforts, fit_riegel_exponent, format_time, merge_efforts, predict_time
-from engine.models import finish_time
+from engine.models import finish_time, heat_factor
 from engine.montecarlo import run_monte_carlo, summarize
 from engine.pacing import compare_strategies, effort_profile, half_splits, km_splits
 
@@ -81,6 +81,36 @@ def save_upload(upload, folder, index):
 def rounded(values, digits=1):
     return [round(float(v), digits) for v in values]
 
+def build_insights(course, best_paces, effort, base_pace, temp_c, dew_c, goal, simulations):
+    """Plain-language facts for the results page: the biggest climb and the effect of weather."""
+    # Biggest climb: the 3 km stretch with the most elevation gain
+    km_index = (course.distance // 1000).astype(int)
+    gain = np.clip(np.diff(course.elevation, append=course.elevation[-1]), 0, None)
+    gain_per_km = np.bincount(km_index, weights=gain)
+    window = min(3, len(gain_per_km))
+    sums = np.convolve(gain_per_km, np.ones(window), mode="valid")
+    start = int(np.argmax(sums))
+    splits = km_splits(course, best_paces)
+    climb = {
+        "start_km": start,
+        "end_km": start + window,
+        "gain_m": round(float(sums[start]), 1),
+        "slowest_pace_s": round(float(np.max(splits[start:start + window]))),
+    }
+
+    # Weather: compare with a warm day if it's cool, or with a cool day if it's warm
+    hot = bool(heat_factor(temp_c, dew_c) > 1.0)
+    compare_temp, compare_dew = (12.0, 5.0) if hot else (22.0, 16.0)
+    compare_times = run_monte_carlo(course, base_pace, effort, compare_temp, compare_dew, n=simulations, seed=1)
+    compare = summarize(compare_times, goal)
+    weather = {
+        "hot": hot,
+        "compare_temp_c": compare_temp,
+        "compare_dew_c": compare_dew,
+        "compare_median_s": round(compare["median"]),
+        "compare_p_goal": round(compare["p_goal"], 3),
+    }
+    return {"climb": climb, "weather": weather}
 
 # --- Endpoints -----------------------------------------------------------------
 
@@ -165,8 +195,9 @@ def simulate_race(
     conditions = {"temp_c": temp_c, "dew_c": dew_c}
     strategies, best = compare_strategies(course, base_pace, **conditions)
     effort = effort_profile(course, best["hill_response"], best["split"])
-    times = run_monte_carlo(course, base_pace, effort, temp_c, dew_c, n=simulations)
+    times = run_monte_carlo(course, base_pace, effort, temp_c, dew_c, n=simulations, seed=1)
     stats = summarize(times, goal)
+    insights = build_insights(course, best["paces"], effort, base_pace, temp_c, dew_c, goal, simulations)
     counts, edges = np.histogram(times, bins=30)
 
     return {
@@ -217,6 +248,7 @@ def simulate_race(
             "range_text": f"{format_time(stats['p10'])} - {format_time(stats['p90'])}",
             "histogram": {"edges": rounded(edges, 0), "counts": counts.tolist()},
         },
+        "insights": insights,
     }
 
 

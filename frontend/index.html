@@ -4,88 +4,141 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Race Day Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600&family=Work+Sans:wght@400;500&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
+  <header class="page-header">
     <h1>Race Day Simulator</h1>
-    <p>Simulate your marathon before you run it: course, fitness, weather, and pacing.</p>
+    <p>See your finish time before race day.</p>
   </header>
 
   <main>
-    <form id="sim-form" class="card">
-      <h2>1. Course</h2>
-      <label>Built-in course
-        <select id="course_id"></select>
-      </label>
-      <label>Or upload your own course (GPX)
-        <input type="file" id="course_file" accept=".gpx">
-      </label>
-      <label>Official distance of your uploaded course in km (optional)
-        <input type="number" id="course_distance_km" step="0.001" min="1">
-      </label>
+    <form id="sim-form" novalidate>
+      <!-- Step 1: course -->
+      <section class="step" aria-labelledby="step-course">
+        <h2 id="step-course"><span class="step-num">1</span>Choose your race</h2>
+        <div class="course-options" id="course-options" role="radiogroup" aria-label="Course">
+          <!-- Built-in courses are added here by app.js -->
+          <label class="option-card upload-card">
+            <input type="radio" name="course" value="upload">
+            <span class="option-title">Upload your own course</span>
+            <span class="option-sub">GPX file</span>
+          </label>
+        </div>
+        <div id="upload-fields" class="upload-fields" hidden>
+          <label>Course file (GPX)
+            <input type="file" id="course_file" accept=".gpx">
+          </label>
+          <label>Official distance in km (optional)
+            <input type="number" id="course_distance_km" step="0.001" min="1" placeholder="42.195">
+          </label>
+        </div>
+      </section>
 
-      <h2>2. Fitness</h2>
-      <label>Training runs (GPX, FIT, or TCX, several allowed)
-        <input type="file" id="runs" multiple accept=".gpx,.fit,.tcx">
-      </label>
-      <div class="records">
-        <span class="label-text">Personal records (optional)</span>
-        <div id="records"></div>
-        <button type="button" id="add-record" class="secondary">+ Add personal records</button>
-      </div>
-      <label>Or enter your current fitness for this distance (h:mm:ss)
-        <input type="text" id="fitness_time" placeholder="3:55:00">
-      </label>
+      <!-- Step 2: fitness -->
+      <section class="step" aria-labelledby="step-fitness">
+        <h2 id="step-fitness"><span class="step-num">2</span>Tell us your fitness</h2>
+        <div class="segmented" role="tablist" aria-label="Fitness method">
+          <button type="button" role="tab" class="seg" data-method="times" aria-selected="true">Race times</button>
+          <button type="button" role="tab" class="seg" data-method="files" aria-selected="false">Watch files</button>
+          <button type="button" role="tab" class="seg" data-method="quick" aria-selected="false">Quick estimate</button>
+        </div>
 
-      <h2>3. Race day</h2>
-      <div class="row">
-        <label>Goal time
-          <input type="text" id="goal_time" value="4:00:00">
-        </label>
-        <label>Temperature (°C)
-          <input type="number" id="temp_c" value="12" step="0.5">
-        </label>
-        <label>Dew point (°C)
-          <input type="number" id="dew_c" value="5" step="0.5">
-        </label>
-        <label>Simulations
-          <input type="number" id="simulations" value="2000" min="100" max="10000" step="100">
-        </label>
-      </div>
+        <div class="method-panel" data-panel="times">
+          <p class="hint">Add recent races or time trials. More races give a better prediction.</p>
+          <div id="records"></div>
+          <button type="button" id="add-record" class="link-button">+ Add a race</button>
+        </div>
 
-      <button type="submit" id="submit">Simulate race</button>
+        <div class="method-panel" data-panel="files" hidden>
+          <label class="dropzone">
+            <input type="file" id="runs" multiple accept=".gpx,.fit,.tcx">
+            <span class="dropzone-title" id="runs-label">Choose or drop GPX, FIT, or TCX files</span>
+            <span class="hint">Files are analyzed and deleted right away. Any race times you added are combined with them.</span>
+          </label>
+        </div>
+
+        <div class="method-panel" data-panel="quick" hidden>
+          <label>Your current fitness for this distance (h:mm:ss)
+            <input type="text" id="fitness_time" placeholder="3:55:00" inputmode="numeric">
+          </label>
+        </div>
+      </section>
+
+      <!-- Step 3: goal and weather -->
+      <section class="step" aria-labelledby="step-race">
+        <h2 id="step-race"><span class="step-num">3</span>Set your goal and weather</h2>
+        <div class="race-row">
+          <label class="goal">Goal time
+            <input type="text" id="goal_time" value="4:00:00" inputmode="numeric">
+          </label>
+          <fieldset class="weather">
+            <legend>Race-day weather</legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="weather" value="cool" checked><span>Cool 12°</span></label>
+              <label class="chip"><input type="radio" name="weather" value="mild"><span>Mild 18°</span></label>
+              <label class="chip"><input type="radio" name="weather" value="warm"><span>Warm 22°</span></label>
+              <label class="chip"><input type="radio" name="weather" value="hot"><span>Hot 27°</span></label>
+            </div>
+          </fieldset>
+        </div>
+        <details class="more">
+          <summary>More options</summary>
+          <div class="more-grid">
+            <label>Temperature (°C)
+              <input type="number" id="temp_c" value="12" step="0.5">
+            </label>
+            <label>Dew point (°C)
+              <input type="number" id="dew_c" value="5" step="0.5">
+            </label>
+            <label>Simulations
+              <input type="number" id="simulations" value="2000" min="100" max="10000" step="100">
+            </label>
+          </div>
+        </details>
+      </section>
+
+      <button type="submit" id="submit" class="primary">Simulate my race</button>
       <p id="status" role="status"></p>
     </form>
 
-    <section id="results" hidden>
-      <div class="stats">
-        <div class="card stat">
-          <span class="label" id="p-goal-label">Chance of goal</span>
-          <span class="value" id="p-goal"></span>
+    <section id="results" hidden aria-label="Results">
+      <!-- Finish gantry -->
+      <div class="gantry">
+        <div class="gantry-banner">
+          <span id="gantry-course"></span>
+          <span>Projected finish</span>
         </div>
-        <div class="card stat">
-          <span class="label">Median finish</span>
-          <span class="value" id="median"></span>
+        <div class="gantry-screen">
+          <span class="gantry-ghost" id="clock-ghost" aria-hidden="true">8:88:88</span>
+          <span class="gantry-clock" id="median">0:00:00</span>
         </div>
-        <div class="card stat">
-          <span class="label">80% of races</span>
-          <span class="value small" id="range"></span>
-        </div>
-        <div class="card stat">
-          <span class="label">Predicted fitness</span>
-          <span class="value" id="predicted"></span>
+        <div class="gantry-stats">
+          <div><strong id="p-goal"></strong><span id="p-goal-label"></span></div>
+          <div><strong id="range"></strong><span>most likely range</span></div>
+          <div><strong id="avg-pace"></strong><span>average pace</span></div>
         </div>
       </div>
 
-        <div class="card">
-         <h2>Course</h2>
-          <p id="course-info" class="note"></p>
+      <ul class="takeaways" id="takeaways"></ul>
+
+      <!-- Detail tabs -->
+      <div class="tabs" role="tablist" aria-label="Result details">
+        <button type="button" role="tab" class="tab" id="tab-course" aria-controls="panel-course" aria-selected="true">Course and replay</button>
+        <button type="button" role="tab" class="tab" id="tab-pacing" aria-controls="panel-pacing" aria-selected="false" tabindex="-1">Pacing</button>
+        <button type="button" role="tab" class="tab" id="tab-finish" aria-controls="panel-finish" aria-selected="false" tabindex="-1">Finish times</button>
+        <button type="button" role="tab" class="tab" id="tab-splits" aria-controls="panel-splits" aria-selected="false" tabindex="-1">Splits</button>
+      </div>
+
+      <div role="tabpanel" class="tab-panel" id="panel-course" aria-labelledby="tab-course">
+        <p id="course-info" class="hint"></p>
         <div id="map"></div>
         <div class="replay">
-          <button type="button" id="play">▶ Play</button>
+          <button type="button" id="play" class="round-button" aria-label="Play replay">▶</button>
           <input type="range" id="scrub" min="0" max="1" value="0" aria-label="Race time">
           <select id="speed" aria-label="Replay speed">
             <option value="60">60×</option>
@@ -93,47 +146,37 @@
             <option value="900">900×</option>
           </select>
         </div>
-        <p id="replay-info" class="note"></p>
-        <p class="note">Orange dot: you, following the optimized plan. Gray dot: even pace at your goal time.</p>
+        <p id="replay-info" class="hint"></p>
+        <p class="hint">Amber dot: you, following the optimized plan. Gray dot: even pace at your goal time.</p>
       </div>
 
-        <div class="card">
-          <h2>Elevation and planned pace</h2>
-          <p class="note">The orange line is your optimized pace (higher = faster). Watch it dip on climbs and rise on descents.</p>
+      <div role="tabpanel" class="tab-panel" id="panel-pacing" aria-labelledby="tab-pacing" hidden>
+        <p class="hint">The amber line is your planned pace (higher is faster). The gray area is elevation.</p>
         <div class="chart-box"><canvas id="profile-chart"></canvas></div>
-      </div>
-
-        <div class="card">
-          <h2>Finish-time distribution</h2>
-          <p id="histogram-note" class="note"></p>
-        <div class="chart-box"><canvas id="histogram-chart"></canvas></div>
-       </div>
-      </div>
-
-      <div class="card">
-        <h2>Pacing strategies</h2>
+        <h3>Pacing strategies</h3>
         <table id="strategies"></table>
-        <p id="optimized-note" class="note"></p>
+        <p id="optimized-note" class="hint"></p>
       </div>
 
-      <div class="card">
-        <h2>Fitness</h2>
-        <p id="fitness-source" class="note"></p>
-        <ul id="efforts"></ul>
-        <ul id="skipped" class="warning"></ul>
+      <div role="tabpanel" class="tab-panel" id="panel-finish" aria-labelledby="tab-finish" hidden>
+        <p id="histogram-note" class="hint"></p>
+        <div class="chart-box"><canvas id="histogram-chart"></canvas></div>
+        <h3>Where the prediction comes from</h3>
+        <p id="fitness-source" class="hint"></p>
+        <ul id="efforts" class="plain-list"></ul>
+        <ul id="skipped" class="plain-list warning"></ul>
       </div>
 
-      <div class="card">
-        <h2>Splits (optimized plan)</h2>
-        <label class="incline">Every
-          <select id="split-interval">
-            <option value="1">1 km</option>
-            <option value="5">5 km</option>
-            <optiion value="10">10 km</option>
-            </select>
-        </label>
-      </div>
-        <button type="button" id="download-band" class="secondary">Download pace band (PNG)</button>
+      <div role="tabpanel" class="tab-panel" id="panel-splits" aria-labelledby="tab-splits" hidden>
+        <div class="splits-bar">
+          <div class="segmented" role="group" aria-label="Split interval">
+            <button type="button" class="seg" data-interval="1" aria-pressed="false">1 km</button>
+            <button type="button" class="seg" data-interval="5" aria-pressed="true">5 km</button>
+            <button type="button" class="seg" data-interval="10" aria-pressed="false">10 km</button>
+          </div>
+          <button type="button" id="download-band" class="secondary">Download pace band</button>
+        </div>
+        <p class="hint" id="band-hint"></p>
         <div class="table-scroll">
           <table id="splits"></table>
         </div>

@@ -47,7 +47,8 @@ def test_simulate_with_manual_fitness():
     assert len(body["strategies"]) == 3
     assert 0 <= body["monte_carlo"]["p_goal"] <= 1
     assert len(body["course"]["lat"]) == len(body["course"]["elevation"])
-
+    assert body["insights"]["climb"]["end_km"] > body["insights"]["climb"]["start_km"]
+    assert body["insights"]["weather"]["hot"] is False
 
 def test_simulate_with_uploaded_run():
     files = [("runs", ("run.tcx", make_tcx(), "application/xml"))]
