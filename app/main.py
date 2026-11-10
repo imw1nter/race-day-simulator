@@ -1,3 +1,4 @@
+import json
 import tempfile
 from pathlib import Path
 from typing import List, Optional
@@ -7,7 +8,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 
 from engine.course import build_course
-from engine.fitness import collect_best_efforts, fit_riegel_exponent, format_time, predict_time
+from engine.fitness import collect_best_efforts, fit_riegel_exponent, format_time, merge_efforts, predict_time
 from engine.models import finish_time
 from engine.montecarlo import run_monte_carlo, summarize
 from engine.pacing import compare_strategies, effort_profile, half_splits, km_splits
@@ -36,6 +37,33 @@ def parse_time(text):
     if m >= 60 or s >= 60 or h * 3600 + m * 60 + s <= 0:
         raise ValueError(f"invalid time '{text}' (use h:mm:ss)")
     return h * 3600 + m * 60 + s
+
+MAX_SPEED = 8.0  # m/s (~2:05/km): faster than any world record pace for these distances
+
+
+def parse_records(text):
+    """Parse personal records sent as JSON: [{"distance_km": 5, "time": "21:47"}, ...].
+    Returns a dict of distance (m) -> time (s). Raises ValueError if invalid."""
+    try:
+        items = json.loads(text)
+    except json.JSONDecodeError:
+        raise ValueError("personal records must be valid JSON")
+    if not isinstance(items, list) or len(items) > 20:
+        raise ValueError("personal records must be a list of at most 20 items")
+
+    records = {}
+    for item in items:
+        try:
+            distance = round(float(item["distance_km"]) * 1000, 1)
+            seconds = parse_time(str(item["time"]))
+        except (KeyError, TypeError, ValueError):
+            raise ValueError(f"invalid personal record: {item}")
+        if not 800 <= distance <= 50000:
+            raise ValueError("personal record distances must be between 0.8 and 50 km")
+        if distance / seconds > MAX_SPEED:
+            raise ValueError(f"{item['time']} for {distance / 1000:g} km is unrealistically fast")
+        records[distance] = min(seconds, records.get(distance, seconds))
+    return records
 
 
 def save_upload(upload, folder, index):
@@ -72,6 +100,7 @@ def simulate_race(
     course_file: Optional[UploadFile] = File(None, description="Your own course as GPX"),
     course_distance_km: Optional[float] = Form(None, description="Official distance of an uploaded course"),
     runs: Optional[List[UploadFile]] = File(None, description="Training runs (GPX, FIT, TCX)"),
+    records: Optional[str] = Form(None, description='Personal records as JSON, e.g [{"distance_km": 5, "time": "21:47"}]'),
     fitness_time: Optional[str] = Form(None, description="Manual fitness: your current time for this distance, e.g. 3:55:00"),
     goal_time: str = Form("4:00:00", description="Goal finish time"),
     temp_c: float = Form(12.0, description="Race temperature (°C)"),
@@ -82,6 +111,7 @@ def simulate_race(
     try:
         goal = parse_time(goal_time)
         manual_fitness = parse_time(fitness_time) if fitness_time else None
+        records_efforts = parse_records(records) if records else {}
     except ValueError as e:
         raise HTTPException(400, str(e))
     if not -10 <= temp_c <= 45:
@@ -114,13 +144,16 @@ def simulate_race(
 
         # Fitness: manual time takes priority, otherwise training runs
         run_paths = [save_upload(u, tmp, i) for i, u in enumerate(runs)]
-        efforts, skipped = collect_best_efforts(run_paths)
+        run_efforts, skipped = collect_best_efforts(run_paths)
+        efforts, sources = merge_efforts(run_efforts, records_efforts)
         exponent = None
         if manual_fitness:
             predicted, source = manual_fitness, "manual"
         elif efforts:
             exponent = fit_riegel_exponent(efforts)
             predicted, source = predict_time(efforts, course.total_distance, exponent), "runs"
+            kinds = set(sources.values())
+            source = "runs+records" if len(kinds) == 2 else ("records" if kinds == {"record"} else "runs")
         else:
             detail = "provide fitness_time or at least one usable training run"
             if skipped:
@@ -152,7 +185,7 @@ def simulate_race(
             "predicted_text": format_time(predicted),
             "exponent": round(exponent, 3) if exponent else None,
             "best_efforts": [
-                {"distance_m": d, "time_s": round(t), "time_text": format_time(t)}
+                {"distance_m": d, "time_s": round(t), "time_text": format_time(t), "source": sources[d]}
                 for d, t in sorted(efforts.items())
             ],
             "skipped": [{"file": n, "reason": r} for n, r in skipped],

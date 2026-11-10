@@ -392,6 +392,61 @@ async function loadCourses() {
   }));
 }
 
+// --- Personal records --------------------------------------------------------
+
+const RECORD_DISTANCES = [
+  ["1 km", 1], ["3 km", 3], ["5 km", 5], ["10 km", 10],
+  ["Half marathon", 21.0975], ["Marathon", 42.195],
+];
+
+function addRecordRow(distanceKm = 5, time = "") {
+  const row = document.createElement("div");
+  row.className = "record-row";
+
+  const select = document.createElement("select");
+  select.setAttribute("aria-label", "Record distance");
+  for (const [label, km] of RECORD_DISTANCES) {
+    const option = document.createElement("option");
+    option.value = km;
+    option.textContent = label;
+    option.selected = km === distanceKm;
+    select.appendChild(option);
+  }
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "e.g. 21:47";
+  input.value = time;
+  input.setAttribute("aria-label", "Record time");
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "secondary remove";
+  remove.textContent = "✕";
+  remove.setAttribute("aria-label", "Remove record");
+  remove.addEventListener("click", () => row.remove());
+
+  row.append(select, input, remove);
+  $("records").appendChild(row);
+}
+
+function collectRecords() {
+  return [...document.querySelectorAll(".record-row")]
+    .map((row) => ({
+      distance_km: Number(row.querySelector("select").value),
+      time: row.querySelector("input").value.trim(),
+    }))
+    .filter((r) => r.time); // ignore rows left empty
+}
+
+function distanceLabel(meters) {
+  if (Math.abs(meters - 21097.5) < 1) return "Half marathon";
+  if (Math.abs(meters - 42195) < 1) return "Marathon";
+  return `${(meters / 1000).toFixed(meters % 1000 === 0 ? 0 : 1)} km`;
+}
+
+$("add-record").addEventListener("click", () => addRecordRow());
+
 // --- Form --------------------------------------------------------------------
 
 function buildFormData() {
@@ -403,6 +458,8 @@ function buildFormData() {
   if ($("course_distance_km").value) fd.append("course_distance_km", $("course_distance_km").value);
 
   for (const file of $("runs").files) fd.append("runs", file);
+  const records = collectRecords();
+  if (records.length) fd.append("records", JSON.stringify(records));
   const fitness = $("fitness_time").value.trim();
   if (fitness) fd.append("fitness_time", fitness);
 
@@ -460,14 +517,19 @@ function showResults(data) {
     `(0 = even pace, 1 = even effort), effort change over the race ${(opt.split * 100).toFixed(0)}%.`;
 
   // Fitness
-  $("fitness-source").textContent = data.fitness.source === "manual"
-    ? "Using the fitness time you entered."
-    : `Estimated from your training runs (fatigue exponent ${data.fitness.exponent}).`;
+  const sourceText = {
+    manual: "Using the fitness time you entered.",
+    runs: "Estimated from your training runs",
+    records: "Estimated from your personal records",
+    "runs+records": "Estimated from your training runs and personal records",
+  }[data.fitness.source];
+  $("fitness-source").textContent = data.fitness.exponent
+    ? `${sourceText} (fatigue exponent ${data.fitness.exponent}).`
+    : sourceText;
   fillList($("efforts"), data.fitness.best_efforts.map(
-    (e) => `Best ${(e.distance_m / 1000).toFixed(1)} km: ${e.time_text}`,
+    (e) => `${distanceLabel(e.distance_m)}: ${e.time_text} (${e.source === "record" ? "personal record" : "from runs"})`,
   ));
-  fillList($("skipped"), data.fitness.skipped.map((s) => `Skipped ${s.file}: ${s.reason}`));
-
+  
   // Kilometre splits (the last one is usually a partial kilometre)
   const totalKm = data.course.distance_m / 1000;
   const splits = opt.km_splits;

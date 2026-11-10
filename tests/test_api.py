@@ -1,3 +1,5 @@
+import json
+
 from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
@@ -53,6 +55,13 @@ def test_simulate_with_uploaded_run():
     assert r.status_code == 200
     assert r.json()["fitness"]["source"] == "runs"
 
+def test_simulate_with_records_only():
+    records = json.dumps([{"distance_km": 5, "time": "21:47"}, {"distance_km": 10, "time": "45:30"}])
+    r = client.post("/api/simulate", data={"records": records, "simulations": "200"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["fitness"]["source"] == "records"
+    assert len(body["fitness"]["best_efforts"]) == 2
 
 def test_missing_fitness_is_rejected():
     r = client.post("/api/simulate", data={"simulations": "200"})
@@ -66,4 +75,14 @@ def test_invalid_goal_time_is_rejected():
 
 def test_dew_point_above_temperature_is_rejected():
     r = client.post("/api/simulate", data={"fitness_time": "3:55:00", "temp_c": "10", "dew_c": "15"})
+    assert r.status_code == 400
+
+def test_invalid_records_json_is_rejected():
+    r = client.post("/api/simulate", data={"records": "not json"})
+    assert r.status_code == 400
+
+
+def test_impossible_record_is_rejected():
+    records = json.dumps([{"distance_km": 10, "time": "10:00"}])
+    r = client.post("/api/simulate", data={"records": records})
     assert r.status_code == 400

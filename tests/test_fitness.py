@@ -8,6 +8,7 @@ from engine.fitness import (
     fit_riegel_exponent,
     predict_time,
     split_samples,
+    merge_efforts,
 )
 
 
@@ -77,6 +78,19 @@ def test_marathon_slower_than_half():
     k = fit_riegel_exponent(efforts)
     assert predict_time(efforts, 42195, k) > 2 * predict_time(efforts, 21097.5, k)
 
+def test_merge_keeps_faster_time():
+    runs = {5000: 1500}
+    records = {5000: 1400.0, 10000: 3000.0}
+    efforts, sources = merge_efforts(runs, records)
+    assert efforts[5000] == 1400
+    assert sources[5000] == "record"
+    assert sources[10000] == "record"
+
+
+def test_merge_keeps_run_when_faster():
+    efforts, sources = merge_efforts({5000: 1300}, {5000: 1400.0})
+    assert efforts[5000] == 1300
+    assert sources[5000] == "run"
 
 # --- Cleaning samples ----------------------------------------------------------
 

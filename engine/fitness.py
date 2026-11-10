@@ -181,6 +181,21 @@ def collect_best_efforts(run_paths):
                     efforts[target] = t
     return efforts, skipped
 
+def merge_efforts(run_efforts, records):
+    """Combine best efforts from runs with manually entered personal records.
+
+    Both are dicts of distance (m) -> time (s). The faster time wins for each
+    distance. Returns (efforts, sources), where sources maps each distance to
+    "run" or "record".
+    """
+    efforts = dict(run_efforts)
+    sources = {d: "run" for d in efforts}
+    for d, t in records.items():
+        if d not in efforts or t < efforts[d]:
+            efforts[d] = t
+            sources[d] = "record"
+    return efforts, sources
+
 
 def fit_riegel_exponent(efforts):
     """Estimate the personal fatigue exponent k from best efforts."""
