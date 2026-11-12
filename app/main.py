@@ -11,11 +11,17 @@ from engine.course import build_course
 from engine.fitness import collect_best_efforts, fit_riegel_exponent, format_time, merge_efforts, predict_time
 from engine.models import finish_time, heat_factor
 from engine.montecarlo import run_monte_carlo, summarize
-from engine.pacing import compare_strategies, effort_profile, half_splits, km_splits
+from engine.pacing import compare_strategies, effort_profile, half_splits, km_splits, time_breakdown
 
 ROOT = Path(__file__).resolve().parent.parent
 COURSES = {
     "osaka": {"name": "Osaka Marathon", "file": ROOT / "sample_data" / "osaka.gpx", "distance": 42195},
+    "seoul": {"name": "Seoul Marathon", "file": ROOT / "sample_data" / "Seoul_marathon.gpx", "distance": 42195},
+    "JTBC seoul": {"name": "JTBC Seoul Marathon", "file": ROOT / "sample_data" / "JTBC_Seoul_marathon.gpx", "distance": 42195},
+    "chuncheon": {"name": "Chuncheon Marathon", "file": ROOT / "sample_data" / "Chuncheon_marathon.gpx", "distance": 42195},
+    "gyeongju": {"name": "Gyeongju Marathon", "file": ROOT / "sample_data" / "gyeongju_marathon.gpx", "distance": 42195},
+    "gongju": {"name": "Gongju Marathon", "file": ROOT / "sample_data" / "gongju_marathon.gpx", "distance": 42195}
+    
 }
 MAX_FILES = 30
 MAX_FILE_BYTES = 20 * 1024 * 1024  # 20 MB
@@ -198,6 +204,8 @@ def simulate_race(
     times = run_monte_carlo(course, base_pace, effort, temp_c, dew_c, n=simulations, seed=1)
     stats = summarize(times, goal)
     insights = build_insights(course, best["paces"], effort, base_pace, temp_c, dew_c, goal, simulations)
+    breakdown = time_breakdown(course, base_pace, effort, temp_c, dew_c)
+    breakdown["temp_c"] = temp_c
     counts, edges = np.histogram(times, bins=30)
 
     return {

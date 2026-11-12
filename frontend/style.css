@@ -470,10 +470,81 @@ th { color: var(--muted); font-weight: 500; font-size: 0.85rem; }
 
 main { padding-bottom: 4rem; }
 
+/* --- Time breakdown --------------------------------------------------------------- */
+
+.breakdown {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: var(--surface);
+}
+.breakdown-title { margin-bottom: 0.75rem; font-size: 1.05rem; }
+.breakdown .hint { margin: 0.75rem 0 0; }
+
+.breakdown-rows {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) 1fr auto;
+  align-items: center;
+  gap: 0.55rem 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.breakdown-track { height: 10px; border-radius: 5px; background: var(--field); overflow: hidden; }
+.breakdown-bar { height: 100%; border-radius: 5px; background: var(--accent); }
+.breakdown-bar.minus { background: var(--muted); }
+.breakdown-value { font-family: var(--font-display); font-weight: 500; text-align: right; }
+.breakdown-value.added { color: var(--accent); }
+.breakdown-none { color: var(--muted); font-size: 0.85rem; }
+.breakdown-total { padding-top: 0.55rem; border-top: 1px solid var(--border); font-weight: 500; }
+.breakdown-total.breakdown-value { font-size: 1.15rem; }
+
+/* --- Method tab ------------------------------------------------------------------- */
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pipeline li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem;
+  border-radius: 12px;
+  background: var(--surface);
+}
+.pipeline span:last-child { color: var(--muted); font-size: 0.85rem; }
+.pipe-num { color: var(--accent); font-family: var(--font-display); font-weight: 500; }
+
+.faq details { border-bottom: 1px solid var(--border); }
+.faq summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 0.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--muted); font-size: 1.2rem; transition: transform 0.2s; }
+.faq details[open] summary::after { transform: rotate(45deg); color: var(--accent); }
+.faq details p { margin: 0 0.1rem 1rem; color: var(--muted); font-size: 0.92rem; }
+.sources { margin-top: 1.5rem; font-size: 0.8rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .faq summary::after { transition: none; }
+}
+
 /* --- Small screens --------------------------------------------------------------- */
 
 @media (max-width: 560px) {
   .step { padding: 1.1rem; }
   .gantry-stats { grid-template-columns: 1fr; }
   .goal { width: 100%; }
+  .breakdown-rows { grid-template-columns: 1fr auto; }
+  .breakdown-track { grid-column: 1 / -1; order: 1;}
 }

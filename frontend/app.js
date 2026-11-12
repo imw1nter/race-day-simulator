@@ -343,9 +343,50 @@ function renderTakeaways(data) {
   }));
 }
 
+// --- Time breakdown -----------------------------------------------------------------------
+
+function signed(seconds) {
+  return `${seconds < 0 ? "−" : "+"}${fmtDuration(Math.abs(seconds))}`;
+}
+
+function renderBreakdown(data) {
+  const b = data.breakdown;
+  $("breakdown-box").hidden = !b;
+  if (!b) return;
+
+  const factors = [
+    ["Hills on this course", b.hills_s],
+    [`Heat (${b.temp_c}°C)`, b.heat_s],
+    ["Late-race fatigue", b.fatigue_s],
+  ];
+  const biggest = Math.max(1, ...factors.map(([, s]) => Math.abs(s)));
+  const cells = [];
+
+  cells.push(el("span", "", "Your fitness on flat ground"), el("span"),
+    el("span", "breakdown-value", fmtTime(b.flat_fitness_s)));
+
+  for (const [label, seconds] of factors) {
+    cells.push(el("span", "", label));
+    if (Math.abs(seconds) < 1) {
+      cells.push(el("span", "breakdown-none", "no effect"), el("span", "breakdown-value", "+0:00"));
+      continue;
+    }
+    const track = el("div", "breakdown-track");
+    const bar = el("div", `breakdown-bar${seconds < 0 ? " minus" : ""}`);
+    bar.style.width = `${(Math.abs(seconds) / biggest) * 100}%`; // bars compare the factors with each other
+    track.appendChild(bar);
+    cells.push(track, el("span", `breakdown-value${seconds > 0 ? " added" : ""}`, signed(seconds)));
+  }
+
+  cells.push(el("span", "breakdown-total", "Planned finish"), el("span", "breakdown-total"),
+    el("span", "breakdown-total breakdown-value", fmtTime(b.planned_s)));
+
+  $("breakdown").replaceChildren(...cells);
+}
+
 // --- Tabs -------------------------------------------------------------------------------------
 
-const TABS = ["course", "pacing", "finish", "splits"];
+const TABS = ["course", "pacing", "finish", "splits", "method"];
 
 function selectTab(name) {
   for (const t of TABS) {
@@ -387,6 +428,7 @@ function showResults(data) {
   $("avg-pace").textContent = fmtPace(mc.median_s / totalKm);
 
   renderTakeaways(data);
+  renderBreakdown(data);
 
   // Course tab
   $("course-info").textContent =

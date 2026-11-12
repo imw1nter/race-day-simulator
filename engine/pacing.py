@@ -1,6 +1,7 @@
 import numpy as np
 
 from engine.models import fatigue_factor, finish_time, grade_factor, heat_factor
+from dataclasses import replace
 
 STRAIN_WEIGHT = 40.0  # modeling assumption: how much over-exertion worsens late fatigue
 
@@ -55,6 +56,30 @@ def compare_strategies(course, base_pace, **conditions):
     results["Optimized"] = best["paces"]
     return results, best
 
+def time_breakdown(course, base_pace, effort, temp_c=12, dew_c=5):
+    """Split the planned finish time into what each factor adds.
+
+    Factors are added one at a time (flat and cool with no fatigue, then hills,
+    then heat, then late-race fatigue), so the parts add up exactly to the
+    planned finish. Returns whole seconds.
+    """
+    flat = replace(course, grade=np.zeros_like(course.grade))
+    cool = {"temp_c": 0.0, "dew_c": 0.0}  # cold enough that the heat model adds nothing
+
+    t_base = finish_time(course, simulate(flat, base_pace, effort, drift=0, **cool))
+    t_hills = finish_time(course, simulate(course, base_pace, effort, drift=0, **cool))
+    t_heat = finish_time(course, simulate(course, base_pace, effort, temp_c, dew_c, drift=0))
+    t_full = finish_time(course, simulate(course, base_pace, effort, temp_c, dew_c))
+
+    # Round the running totals, not the parts, so the parts still add up exactly
+    t = [round(x) for x in (t_base, t_hills, t_heat, t_full)]
+    return {
+        "flat_fitness_s": t[0],
+        "hills_s": t[1] - t[0],
+        "heat_s": t[2] - t[1],
+        "fatigue_s": t[3] - t[2],
+        "planned_s": t[3],
+    }
 
 def half_splits(course, paces):
     """Time (s) for the first and second half of the race."""

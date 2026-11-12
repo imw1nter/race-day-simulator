@@ -4,9 +4,17 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
-from app.main import app, parse_time
+from app.main import COURSES, app, parse_time
+
+from engine.main import build_course
 
 client = TestClient(app)
+
+def test_every_course_loads():
+    for course_id, info in COURSES.item():
+        course = build_course(info["file"], official_distance=info["distance"])
+        assert abs(course.total_distance - info["distance"]) < 200, course_id
+        assert len(course.lat) == len(course.elevation), course_id
 
 
 def make_tcx(km=6, pace=300, step_s=30):
@@ -49,6 +57,8 @@ def test_simulate_with_manual_fitness():
     assert len(body["course"]["lat"]) == len(body["course"]["elevation"])
     assert body["insights"]["climb"]["end_km"] > body["insights"]["climb"]["start_km"]
     assert body["insights"]["weather"]["hot"] is False
+    b = body["breakdown"]
+    assert b["flat_fitness_s"] + b["hills_s"] + b["heat_s"] + b["fatique_s"] == b["planned_s"]
 
 def test_simulate_with_uploaded_run():
     files = [("runs", ("run.tcx", make_tcx(), "application/xml"))]

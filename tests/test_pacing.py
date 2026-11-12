@@ -45,3 +45,19 @@ def test_optimized_is_never_worse():
     results, best = compare_strategies(course, BASE)
     for name in ("Even pace", "Even effort"):
         assert best["time"] <= finish_time(course, results[name]) + 1e-6
+
+def test_breakdown_adds_up():
+    course = make_course()
+    effort = effort_profile(course, 1, 0)
+    b = time_breakdown(course, BASE, effort, temp_c=25, dew_c=18)
+    assert b["flat_fitness_s"] + b["hills_s"] + b["heat_s"] + b["fatigue_s"] == b["planned_s"]
+    assert b["heat_s"] > 0
+    assert b["fatigue_s"] > 0
+
+
+def test_breakdown_flat_and_cool_course():
+    course = make_course(hilly=False)
+    effort = effort_profile(course, 1, 0)
+    b = time_breakdown(course, BASE, effort, temp_c=10, dew_c=2)
+    assert b["hills_s"] == 0
+    assert b["heat_s"] == 0

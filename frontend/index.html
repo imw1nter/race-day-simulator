@@ -126,12 +126,19 @@
 
       <ul class="takeaways" id="takeaways"></ul>
 
+      <div class="breakdown" id="breakdown-box" hidden>
+        <h2 class="breakdown-title">Where your planned finish comes from</h2>
+        <div class="breakdown-rows" id="breakdown"></div>
+        <p class="hint">Each factor is added one at a time by rerunning your race. The projected finish on the clock is the middle of thousands of simulated race days, so it can differ by a few seconds.</p>
+      </div>
+
       <!-- Detail tabs -->
       <div class="tabs" role="tablist" aria-label="Result details">
         <button type="button" role="tab" class="tab" id="tab-course" aria-controls="panel-course" aria-selected="true">Course and replay</button>
         <button type="button" role="tab" class="tab" id="tab-pacing" aria-controls="panel-pacing" aria-selected="false" tabindex="-1">Pacing</button>
         <button type="button" role="tab" class="tab" id="tab-finish" aria-controls="panel-finish" aria-selected="false" tabindex="-1">Finish times</button>
         <button type="button" role="tab" class="tab" id="tab-splits" aria-controls="panel-splits" aria-selected="false" tabindex="-1">Splits</button>
+        <button type="button" role="tab" class="tab" id="tab-method" aria-controls="panel-method" aria-selected="false" tabindex="-1">Method</button>
       </div>
 
       <div role="tabpanel" class="tab-panel" id="panel-course" aria-labelledby="tab-course">
@@ -183,6 +190,47 @@
         <div class="table-scroll">
           <table id="splits"></table>
         </div>
+      </div>
+      <div role="tabpanel" class="tab-panel" id="panel-method" aria-labelledby="tab-method" hidden>
+        <p class="hint">Most race calculators apply one formula to one race time. This simulator models the actual course, the weather, and how you spread your effort, then runs your race thousands of times.</p>
+
+        <ol class="pipeline">
+          <li><span class="pipe-num">1</span><strong>Course</strong><span>Split into 100 m segments, with the slope of each one.</span></li>
+          <li><span class="pipe-num">2</span><strong>Fitness</strong><span>Your best efforts fitted to a personal fatigue curve.</span></li>
+          <li><span class="pipe-num">3</span><strong>Conditions</strong><span>Hills, heat, and late-race fatigue slow each segment.</span></li>
+          <li><span class="pipe-num">4</span><strong>Pacing</strong><span>About 200 plans tested; the fastest one is kept.</span></li>
+          <li><span class="pipe-num">5</span><strong>Simulated races</strong><span>Random race days turn one time into a probability.</span></li>
+        </ol>
+
+        <h3>Frequently asked questions</h3>
+        <div class="faq">
+          <details>
+            <summary>How accurate is the prediction?</summary>
+            <p>It's a model, not a promise. The fitness step uses Riegel's formula, which tends to be optimistic for the marathon, especially for a first one. That's why you get a range and a probability instead of a single number. The amount of race-day variation is a modeling assumption, explained in the project's README.</p>
+          </details>
+          <details>
+            <summary>Does it work without a watch?</summary>
+            <p>Yes. Enter recent race times, or type your current fitness as a single time. Watch files (GPX, FIT, or TCX) are optional and get combined with any race times you add.</p>
+          </details>
+          <details>
+            <summary>Why is my projected finish slower than my fitness time?</summary>
+            <p>Your fitness time describes a fresh effort on flat ground. The simulator then adds what the real race costs: climbs on the course, heat on the day, and the slowdown most runners feel after 30 km. The breakdown under the takeaways shows how much each one adds for you.</p>
+          </details>
+          <details>
+            <summary>What do "hill response" and "effort change" mean?</summary>
+            <p>Hill response describes how much you adjust for hills: 0 means holding the same pace everywhere, and 1 means holding the same effort, slowing on climbs and speeding up on descents. Effort change describes whether effort rises or falls during the race. Every plan uses the same average effort, so the comparison is fair.</p>
+          </details>
+          <details>
+            <summary>What happens to my files?</summary>
+            <p>They're read in a temporary folder that is deleted as soon as your result is ready. Nothing is stored, and nothing is shared.</p>
+          </details>
+          <details>
+            <summary>Which inputs give the best prediction?</summary>
+            <p>Recent all-out efforts at longer distances, like a half marathon from the last few months. Easy training runs make the prediction conservative, because they don't show your real speed.</p>
+          </details>
+        </div>
+
+        <p class="hint sources">Models: hill cost from Minetti et al. (2002), endurance curve from Riegel (1981), heat from the temperature plus dew point rule of thumb. Full details and limitations are in the README.</p>
       </div>
     </section>
   </main>
