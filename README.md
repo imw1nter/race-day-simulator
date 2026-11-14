@@ -74,12 +74,12 @@ Race Day Simulator is an open-source web application that predicts and plans a r
 
 The same runner (marathon fitness 3:30:00, cool weather) on three courses:
 
-<!-- TODO: fill in from your own runs of the simulator -->
+
 | Course | Total climb | Planned finish | Hills add | Recommended strategy |
 |---|---|---|---|---|
-| Osaka Marathon | ~57 m | TODO | TODO | Even effort |
-| Seoul Marathon | ~63 m | TODO | TODO | TODO |
-| Chuncheon Marathon | ~161 m | TODO | TODO | TODO |
+| Osaka Marathon | ~57 m | 3:31:12 | +0:35 | Even effort |
+| Seoul Marathon | ~63 m | 3:31:21 | +0:44 | Even effort |
+| Chuncheon Marathon | ~161 m | 3:33:08 | +2:28 | Even effort |
 
 ---
 
