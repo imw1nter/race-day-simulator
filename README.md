@@ -338,12 +338,14 @@ Other packages in `requirements.txt` are dependencies installed automatically by
 
 ## Data sources
 
-<!-- TODO: fill in the exact links and check each source allows sharing -->
 | Course | Source | Notes |
 |---|---|---|
-| Osaka Marathon | goandrace.com (exported via Garmin Connect), TODO: link | 2025 course; may differ from future years |
-| Seoul Marathon | TODO: source and link (exported via Garmin Connect) | 2025 course |
-| Chuncheon Marathon | TODO: source and link (exported via Garmin Connect) | 2025 course |
+| Osaka Marathon | https://www.goandrace.com/en/map/2025/osaka-marathon-2025-osaka-course-map-1.php#goog_fullscreen_ad | 2025 course |
+| Seoul Marathon | https://wari-gari.com/routes/donga-marathon#google_vignette | 2026 course |
+| JTBC Seoul Marathon | https://marathon.jtbc.com/49/?bmode=view&idx=175326651 | 2026 course |
+| Chuncheon Marathon | https://www.runruun.com/posts/90/ | 2026 course |
+| Gyeongju Marathon | https://wari-gari.com/routes/gyeongju-marathon | 2026 course |
+| Gongju Marathon | https://www.runruun.com/posts/63/ | 2026 course |
 
 The author's personal training runs used during development are **not** included in the repository (they contain GPS locations); `sample_data/runs/` is ignored by Git.
 
