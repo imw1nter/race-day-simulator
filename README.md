@@ -57,7 +57,6 @@ Race Day Simulator is an open-source web application that predicts and plans a r
 
 ## Demo
 
-<!-- TODO: add your screenshots to docs/images/ with these names (see "Adding screenshots" below) -->
 
 | Guided setup | Finish gantry and takeaways |
 |---|---|
@@ -392,11 +391,3 @@ Parts of this project were developed with the help of AI coding assistants (Clau
 This project is licensed under the **MIT License**. See [LICENSE](LICENSE).
 
 ---
-
-## Adding screenshots
-
-<!-- Remove this section once the screenshots are in place -->
-1. Create the folder `docs/images/`.
-2. Run a simulation and take screenshots with **Cmd+Shift+4** (drag to select an area).
-3. Save them as `hero.png`, `setup.png`, `results.png`, `breakdown.png`, `pace-band.png`, and `pace-card.png`.
-4. For `replay.gif`, record the replay with a screen recorder that exports GIFs, such as the free and open-source [Kap](https://getkap.co/) for macOS. Keep it short (about 5–10 seconds) so the file stays small.
