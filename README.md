@@ -2,9 +2,8 @@
 
 **See your marathon finish time before race day.**
 
-Race Day Simulator is an open-source web application that predicts and plans a runner's race. It models the real course (hills from GPS elevation data), the runner's current fitness (from race times or watch files), and race-day weather. It then searches for the best pacing plan and runs the race thousands of times to turn one prediction into a probability, like *"76% chance of breaking 4:00:00."*
+Race Day Simulator is an open-source web application that predicts and plans a runner's race. It models the real course (hills from GPS elevation data), the runner's current fitness (from race times or watch files), and race-day weather. It then searches for the best pacing plan and runs the race thousands of times to turn one prediction into a probability, like *"86% chance of breaking 4:00:00."*
 
-<!-- TODO: replace with your own screenshot -->
 ![Race Day Simulator results page with the finish-gantry clock](docs/images/hero.png)
 
 > Term project for the Open Source Software course, 2026. Built by Muhammad Afiq Farhan ([@imw1nter](https://github.com/imw1nter)).
