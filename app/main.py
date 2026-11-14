@@ -257,6 +257,7 @@ def simulate_race(
             "histogram": {"edges": rounded(edges, 0), "counts": counts.tolist()},
         },
         "insights": insights,
+        "breakdown": breakdown,
     }
 
 
